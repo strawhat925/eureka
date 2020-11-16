@@ -53,6 +53,7 @@ class TaskExecutors<ID, T> {
     void shutdown() {
         if (isShutdown.compareAndSet(false, true)) {
             for (Thread workerThread : workerThreads) {
+            	// 中断线程
                 workerThread.interrupt();
             }
             registeredMonitors.forEach(Monitors::unregisterObject);
@@ -240,8 +241,11 @@ class TaskExecutors<ID, T> {
         public void run() {
             try {
                 while (!isShutdown.get()) {
+                	// 这里使用信号量release，释放一个信号量，这时tryAcquire就可以获取到锁，往队列存放任务
+                	// 据获取单个任务的阻塞队列
                     BlockingQueue<TaskHolder<ID, T>> workQueue = taskDispatcher.requestWorkItem();
                     TaskHolder<ID, T> taskHolder;
+                    // 阻塞获取任务，最多等待1秒
                     while ((taskHolder = workQueue.poll(1, TimeUnit.SECONDS)) == null) {
                         if (isShutdown.get()) {
                             return;
@@ -249,6 +253,7 @@ class TaskExecutors<ID, T> {
                     }
                     metrics.registerExpiryTime(taskHolder);
                     if (taskHolder != null) {
+                    	// 处理实际任务，如服务注册、服务下线、服务心跳等
                         ProcessingResult result = processor.process(taskHolder.getTask());
                         switch (result) {
                             case Success:

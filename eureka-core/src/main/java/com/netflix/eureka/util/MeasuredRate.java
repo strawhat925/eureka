@@ -53,6 +53,12 @@ public class MeasuredRate {
                 @Override
                 public void run() {
                     try {
+                    	// TODO 这是一个不错设计，可以学习
+                    	// 每分钟调用一次
+						// currentBucket是用来当前一分钟内更新心跳的次数，会调用increment()方法对该值进行incr
+						// 一分钟执行完，lastBucket记录上一分更新的心跳次数，并将currentBucket设置为0
+
+
                         // Zero out the current bucket.
                         lastBucket.set(currentBucket.getAndSet(0));
                     } catch (Throwable e) {

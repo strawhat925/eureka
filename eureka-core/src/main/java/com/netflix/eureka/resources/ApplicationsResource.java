@@ -145,6 +145,7 @@ public class ApplicationsResource {
             returnMediaType = MediaType.APPLICATION_XML;
         }
 
+        // 构建缓存key
         Key cacheKey = new Key(Key.EntityType.Application,
                 ResponseCacheImpl.ALL_APPS,
                 keyType, CurrentRequestVersion.get(), EurekaAccept.fromString(eurekaAccept), regions
@@ -157,6 +158,7 @@ public class ApplicationsResource {
                     .header(HEADER_CONTENT_TYPE, returnMediaType)
                     .build();
         } else {
+        	// 如果不存在，触发load加载
             response = Response.ok(responseCache.get(cacheKey))
                     .build();
         }
@@ -239,6 +241,7 @@ public class ApplicationsResource {
                     .header(HEADER_CONTENT_TYPE, returnMediaType)
                     .build();
         } else {
+        	// 如果不存在，触发load加载
             response = Response.ok(responseCache.get(cacheKey)).build();
         }
 

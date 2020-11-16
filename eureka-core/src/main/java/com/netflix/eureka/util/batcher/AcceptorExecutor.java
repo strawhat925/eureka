@@ -194,6 +194,7 @@ class AcceptorExecutor<ID, T> {
                     if (scheduleTime < now) {
                         scheduleTime = now + trafficShaper.transmissionDelay();
                     }
+                    // 打包分批任务
                     if (scheduleTime <= now) {
                         assignBatchWork();
                         assignSingleItemWork();
@@ -219,12 +220,16 @@ class AcceptorExecutor<ID, T> {
 
         private void drainInputQueues() throws InterruptedException {
             do {
+            	// 将reprocess任务添加到processingOrder和pendingTasks中
                 drainReprocessQueue();
+                // 将acceptorQueue任务添加到processingOrder和pendingTasks中
                 drainAcceptorQueue();
 
                 if (isShutdown.get()) {
                     break;
                 }
+
+                // 所有队列都为空时，阻塞10秒，等待任务
                 // If all queues are empty, block for a while on the acceptor queue
                 if (reprocessQueue.isEmpty() && acceptorQueue.isEmpty() && pendingTasks.isEmpty()) {
                     TaskHolder<ID, T> taskHolder = acceptorQueue.poll(10, TimeUnit.MILLISECONDS);

@@ -14,13 +14,18 @@ public class TaskDispatchers {
                                                                                 long congestionRetryDelayMs,
                                                                                 long networkFailureRetryMs,
                                                                                 TaskProcessor<T> taskProcessor) {
+    	// 接收任务线程池子，守护线程；才有3层队列批次处理
+		// 将下线、心跳、注册等分批处理，节省网络开销
         final AcceptorExecutor<ID, T> acceptorExecutor = new AcceptorExecutor<>(
                 id, maxBufferSize, 1, maxBatchingDelay, congestionRetryDelayMs, networkFailureRetryMs
         );
+
+        // 执行任务线程池，默认创建200个守护线程
         final TaskExecutors<ID, T> taskExecutor = TaskExecutors.singleItemExecutors(id, workerCount, taskProcessor, acceptorExecutor);
         return new TaskDispatcher<ID, T>() {
             @Override
             public void process(ID id, T task, long expiryTime) {
+            	// 往队列存放任务
                 acceptorExecutor.process(id, task, expiryTime);
             }
 

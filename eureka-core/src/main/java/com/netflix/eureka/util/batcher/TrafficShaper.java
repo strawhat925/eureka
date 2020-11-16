@@ -39,7 +39,9 @@ class TrafficShaper {
     private volatile long lastNetworkFailure;
 
     TrafficShaper(long congestionRetryDelayMs, long networkFailureRetryMs) {
+    	// 默认congestionRetryDelayMs为100
         this.congestionRetryDelayMs = Math.min(MAX_DELAY, congestionRetryDelayMs);
+        // 默认networkFailureRetryMs为1000
         this.networkFailureRetryMs = Math.min(MAX_DELAY, networkFailureRetryMs);
     }
 
@@ -52,12 +54,14 @@ class TrafficShaper {
     }
 
     long transmissionDelay() {
+    	//
         if (lastCongestionError == -1 && lastNetworkFailure == -1) {
             return 0;
         }
 
         long now = System.currentTimeMillis();
         if (lastCongestionError != -1) {
+        	// 计算阻塞重试时间
             long congestionDelay = now - lastCongestionError;
             if (congestionDelay >= 0 && congestionDelay < congestionRetryDelayMs) {
                 return congestionRetryDelayMs - congestionDelay;
@@ -66,6 +70,7 @@ class TrafficShaper {
         }
 
         if (lastNetworkFailure != -1) {
+        	// 计算网络不可用重试时间
             long failureDelay = now - lastNetworkFailure;
             if (failureDelay >= 0 && failureDelay < networkFailureRetryMs) {
                 return networkFailureRetryMs - failureDelay;

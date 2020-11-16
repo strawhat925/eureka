@@ -73,6 +73,7 @@ public class PeerEurekaNodes {
     }
 
     public void start() {
+    	// 更新集群注册表
         taskExecutor = Executors.newSingleThreadScheduledExecutor(
                 new ThreadFactory() {
                     @Override

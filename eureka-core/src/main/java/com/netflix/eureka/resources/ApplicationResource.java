@@ -162,6 +162,8 @@ public class ApplicationResource {
             return Response.status(400).entity("Missing dataCenterInfo Name").build();
         }
 
+        // TODO 这里硬编码不太友好，可以使用外部化配置参数+策略模式来实现
+
         // handle cases where clients may be registering with bad DataCenterInfo with missing data
         DataCenterInfo dataCenterInfo = info.getDataCenterInfo();
         if (dataCenterInfo instanceof UniqueIdentifier) {
@@ -183,6 +185,9 @@ public class ApplicationResource {
             }
         }
 
+        // TODO 应禁止魔法数字，应使用有含义的常量来处理
+
+        // 调用服务注册
         registry.register(info, "true".equals(isReplication));
         return Response.status(204).build();  // 204 to be backwards compatible
     }

@@ -123,13 +123,19 @@ public class ResponseCacheImpl implements ResponseCache {
     ResponseCacheImpl(EurekaServerConfig serverConfig, ServerCodecs serverCodecs, AbstractInstanceRegistry registry) {
         this.serverConfig = serverConfig;
         this.serverCodecs = serverCodecs;
+        // 是否应该使用只读缓存，默认true
         this.shouldUseReadOnlyResponseCache = serverConfig.shouldUseReadOnlyResponseCache();
         this.registry = registry;
-
+		// 多级缓存更新时间间隔，默认30秒
         long responseCacheUpdateIntervalMs = serverConfig.getResponseCacheUpdateIntervalMs();
+        // 创建读写缓存
         this.readWriteCacheMap =
+				// 初始化要容量，默认1000
                 CacheBuilder.newBuilder().initialCapacity(serverConfig.getInitialCapacityOfResponseCache())
+						// 缓存项在给定时间内没有被写访问（创建或覆盖），则回收。如果认为缓存数据总是在固定时候后变得陈旧不可用，这种回收方式是可取的
+						// 默认3分钟后自动过期
                         .expireAfterWrite(serverConfig.getResponseCacheAutoExpirationInSeconds(), TimeUnit.SECONDS)
+						// 设置删除监听器
                         .removalListener(new RemovalListener<Key, Value>() {
                             @Override
                             public void onRemoval(RemovalNotification<Key, Value> notification) {
@@ -140,6 +146,8 @@ public class ResponseCacheImpl implements ResponseCache {
                                 }
                             }
                         })
+						// 加载注册表
+						// 在第一次get的时候，如果不存在则会执行load
                         .build(new CacheLoader<Key, Value>() {
                             @Override
                             public Value load(Key key) throws Exception {
@@ -147,16 +155,19 @@ public class ResponseCacheImpl implements ResponseCache {
                                     Key cloneWithNoRegions = key.cloneWithoutRegions();
                                     regionSpecificKeys.put(cloneWithNoRegions, key);
                                 }
+                                // 根据对应的key获取注册表
                                 Value value = generatePayload(key);
                                 return value;
                             }
                         });
 
+        // 是否应该使用只读缓存，这里相当于启用了多级缓存，需要定时去刷新多级缓存，以保证多级缓存的正确性
         if (shouldUseReadOnlyResponseCache) {
+        	// 定时刷新只读缓存
             timer.schedule(getCacheUpdateTask(),
                     new Date(((System.currentTimeMillis() / responseCacheUpdateIntervalMs) * responseCacheUpdateIntervalMs)
-                            + responseCacheUpdateIntervalMs),
-                    responseCacheUpdateIntervalMs);
+                            + responseCacheUpdateIntervalMs), // 默认第一次等待30秒后执行
+                    responseCacheUpdateIntervalMs); // 默认每隔30秒执行
         }
 
         try {
@@ -178,6 +189,9 @@ public class ResponseCacheImpl implements ResponseCache {
                     }
                     try {
                         CurrentRequestVersion.set(key.getVersion());
+
+                        // 定时将读写缓存设置到只读缓存中
+
                         Value cacheValue = readWriteCacheMap.get(key);
                         Value currentCacheValue = readOnlyCacheMap.get(key);
                         if (cacheValue != currentCacheValue) {
@@ -211,6 +225,7 @@ public class ResponseCacheImpl implements ResponseCache {
 
     @VisibleForTesting
     String get(final Key key, boolean useReadOnlyCache) {
+    	// 从只读、读写缓存获取
         Value payload = getValue(key, useReadOnlyCache);
         if (payload == null || payload.getPayload().equals(EMPTY_PAYLOAD)) {
             return null;
@@ -251,6 +266,7 @@ public class ResponseCacheImpl implements ResponseCache {
     public void invalidate(String appName, @Nullable String vipAddress, @Nullable String secureVipAddress) {
         for (Key.KeyType type : Key.KeyType.values()) {
             for (Version v : Version.values()) {
+            	// 缓存不同类型的key，空间换时间
                 invalidate(
                         new Key(Key.EntityType.Application, appName, type, v, EurekaAccept.full),
                         new Key(Key.EntityType.Application, appName, type, v, EurekaAccept.compact),
@@ -352,11 +368,15 @@ public class ResponseCacheImpl implements ResponseCache {
     Value getValue(final Key key, boolean useReadOnlyCache) {
         Value payload = null;
         try {
+        	// TODO 服务发现多级缓存
+        	// 使用只读缓存
             if (useReadOnlyCache) {
+            	// 如果只读缓存为空，则从读写缓存获取
                 final Value currentPayload = readOnlyCacheMap.get(key);
                 if (currentPayload != null) {
                     payload = currentPayload;
                 } else {
+                	// 从读写缓存获取，如果不存在会触发读写缓存的load方法，根据key去获取对应的注册表
                     payload = readWriteCacheMap.get(key);
                     readOnlyCacheMap.put(key, payload);
                 }
